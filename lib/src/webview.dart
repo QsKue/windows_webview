@@ -267,6 +267,26 @@ class WebviewController extends ValueNotifier<WebviewValue> {
     return _creatingCompleter.future;
   }
 
+  Future<void> setLockedDown({
+    bool devTools = false,
+    bool acceleratorKeys = false,
+    bool defaultContextMenus = false,
+    bool zoomControl = false,
+    bool statusBar = false,
+    bool allowDownloads = false,
+  }) async {
+    if (_isDisposed) return;
+    assert(value.isInitialized);
+    return _methodChannel.invokeMethod('setLockedDown', <String, dynamic>{
+      'devTools': devTools,
+      'acceleratorKeys': acceleratorKeys,
+      'defaultContextMenus': defaultContextMenus,
+      'zoomControl': zoomControl,
+      'statusBar': statusBar,
+      'allowDownloads': allowDownloads,
+    });
+  }
+
   Future<bool?> _onPermissionRequested(Map<dynamic, dynamic> args) async {
     if (_permissionRequested == null) {
       return null;

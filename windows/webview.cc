@@ -4,6 +4,7 @@
 
 #include <format>
 #include <iostream>
+#include <windows.h>
 
 #include "util/composition.desktop.interop.h"
 #include "util/string_converter.h"
@@ -78,6 +79,7 @@ Webview::Webview(
   wil::com_ptr<ICoreWebView2Settings> settings;
   if (SUCCEEDED(webview_->get_Settings(settings.put()))) {
     settings2_ = settings.try_query<ICoreWebView2Settings2>();
+    settings3_ = settings.try_query<ICoreWebView2Settings3>();
 
     settings->put_IsStatusBarEnabled(FALSE);
     settings->put_AreDefaultContextMenusEnabled(FALSE);
@@ -378,6 +380,13 @@ void Webview::RegisterEventHandlers() {
         Callback<ICoreWebView2DownloadStartingEventHandler>(
             [this](ICoreWebView2* sender,
                    ICoreWebView2DownloadStartingEventArgs* args) -> HRESULT {
+
+              if (!lockdown_.allow_downloads) {
+                args->put_Cancel(TRUE);
+                args->put_Handled(TRUE);
+                return S_OK;
+              }
+              
               wil::com_ptr<ICoreWebView2Deferral> deferral;
               args->GetDeferral(&deferral);
 
@@ -416,6 +425,43 @@ void Webview::RegisterEventHandlers() {
             })
             .Get(),
         &event_registrations_.download_starting_token_);
+  }
+}
+
+void Webview::SetLockedDown(const LockdownConfig& cfg) {
+  lockdown_ = cfg;
+
+  if (!webview_) return;
+
+  wil::com_ptr<ICoreWebView2Settings> settings;
+  if (SUCCEEDED(webview_->get_Settings(settings.put())) && settings) {
+    settings->put_AreDevToolsEnabled(cfg.dev_tools ? TRUE : FALSE);
+
+    settings->put_AreDefaultContextMenusEnabled(cfg.default_context_menus ? TRUE : FALSE);
+
+    settings->put_IsZoomControlEnabled(cfg.zoom_control ? TRUE : FALSE);
+    settings->put_IsStatusBarEnabled(cfg.status_bar ? TRUE : FALSE);
+
+    if (auto s3 = settings.try_query<ICoreWebView2Settings3>()) {
+      s3->put_AreBrowserAcceleratorKeysEnabled(cfg.accelerator_keys ? TRUE : FALSE);
+    }
+  }
+
+  if (webview_controller_) {
+    // remove old handler if any
+    if (accelerator_key_pressed_token_.value != 0) {
+      webview_controller_->remove_AcceleratorKeyPressed(accelerator_key_pressed_token_);
+      accelerator_key_pressed_token_.value = 0;
+    }
+    webview_controller_->add_AcceleratorKeyPressed(
+      Microsoft::WRL::Callback<ICoreWebView2AcceleratorKeyPressedEventHandler>(
+        [this](ICoreWebView2Controller*, ICoreWebView2AcceleratorKeyPressedEventArgs* args) -> HRESULT {
+          if (!lockdown_.accelerator_keys) {
+            args->put_Handled(TRUE);
+          }
+          return S_OK;
+        }).Get(),
+      &accelerator_key_pressed_token_);
   }
 }
 

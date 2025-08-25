@@ -41,6 +41,7 @@ constexpr auto kMethodClearCache = "clearCache";
 constexpr auto kMethodSetCacheDisabled = "setCacheDisabled";
 constexpr auto kMethodSetPopupWindowPolicy = "setPopupWindowPolicy";
 constexpr auto kMethodSetFpsLimit = "setFpsLimit";
+constexpr auto kMethodSetLockedDown = "setLockedDown";
 
 constexpr auto kEventType = "type";
 constexpr auto kEventValue = "value";
@@ -357,6 +358,33 @@ void WebviewBridge::HandleMethodCall(
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
   const auto& method_name = method_call.method_name();
 
+  // setLockedDown: { devTools: bool, acceleratorKeys: bool, defaultContextMenus: bool,
+  //                  zoomControl: bool, statusBar: bool, allowDownloads: bool }
+  if (method_name.compare(kMethodSetLockedDown) == 0) {
+    const auto* map = std::get_if<flutter::EncodableMap>(method_call.arguments());
+    if (!map) {
+      return result->Error(kErrorInvalidArgs);
+    }
+
+    auto getBool = [&](const char* key, bool def) -> bool {
+      auto it = map->find(flutter::EncodableValue(key));
+      if (it == map->end()) return def;
+      if (auto b = std::get_if<bool>(&it->second)) return *b;
+      return def;
+    };
+
+    Webview::LockdownConfig cfg;
+    cfg.dev_tools             = getBool("devTools", false);
+    cfg.accelerator_keys      = getBool("acceleratorKeys", false);
+    cfg.default_context_menus = getBool("defaultContextMenus", false);
+    cfg.zoom_control          = getBool("zoomControl", false);
+    cfg.status_bar            = getBool("statusBar", false);
+    cfg.allow_downloads       = getBool("allowDownloads", false);
+
+    webview_->SetLockedDown(cfg);
+    return result->Success();
+  }
+  
   // setCursorPos: [double x, double y]
   if (method_name.compare(kMethodSetCursorPos) == 0) {
     const auto point = GetPointFromArgs(method_call.arguments());

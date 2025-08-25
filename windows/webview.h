@@ -135,6 +135,15 @@ class Webview {
       ContainsFullScreenElementChangedCallback;
   typedef std::function<void(WebviewDownloadEvent)> DownloadEventCallback;
 
+  struct LockdownConfig {
+    bool dev_tools = false;
+    bool accelerator_keys = false;
+    bool default_context_menus = false;
+    bool zoom_control = false;
+    bool status_bar = false;
+    bool allow_downloads = false;
+  };
+
   ~Webview();
 
   ABI::Windows::UI::Composition::IVisual* const surface() {
@@ -143,6 +152,7 @@ class Webview {
 
   bool IsValid() { return is_valid_; }
 
+  void SetLockedDown(const LockdownConfig& cfg);
   void SetSurfaceSize(size_t width, size_t height, float scale_factor);
   void SetCursorPos(double x, double y);
   void SetPointerUpdate(int32_t pointer, WebviewPointerEventKind eventKind,
@@ -238,12 +248,17 @@ class Webview {
   bool owns_window_;
   bool is_valid_ = false;
   float scale_factor_ = 1.0;
+
+  LockdownConfig lockdown_;
+  EventRegistrationToken accelerator_key_pressed_token_{};
+
   wil::com_ptr<ICoreWebView2CompositionController> composition_controller_;
   wil::com_ptr<ICoreWebView2Controller3> webview_controller_;
   wil::com_ptr<ICoreWebView2> webview_;
   wil::com_ptr<ICoreWebView2DevToolsProtocolEventReceiver>
       devtools_protocol_event_receiver_;
   wil::com_ptr<ICoreWebView2Settings2> settings2_;
+  wil::com_ptr<ICoreWebView2Settings3> settings3_;
   POINT last_cursor_pos_ = {0, 0};
   VirtualKeyState virtual_keys_;
   WebviewPopupWindowPolicy popup_window_policy_ =
